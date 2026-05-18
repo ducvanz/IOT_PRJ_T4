@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Parking Management — Platform Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --surface: #111827;
+    --surface2: #1a2236;
+    --border: #1e2d45;
+    --accent: #3b82f6;
+    --accent2: #06b6d4;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --text3: #475569;
+    --font: 'Inter', 'Segoe UI', sans-serif;
+    --mono: 'JetBrains Mono', 'Fira Code', monospace;
+    --radius: 10px;
+    --shadow: 0 4px 24px rgba(0,0,0,.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; display: flex; }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 220px; min-height: 100vh; background: var(--surface);
+    border-right: 1px solid var(--border); display: flex; flex-direction: column;
+    position: fixed; top: 0; left: 0; z-index: 100;
+  }
+  .logo {
+    padding: 20px 18px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; color: #fff;
+  }
+  .logo-text { font-size: 15px; font-weight: 700; letter-spacing: -.3px; }
+  .logo-sub { font-size: 10px; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; }
+
+  nav { padding: 12px 0; flex: 1; }
+  .nav-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text3); padding: 10px 18px 4px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 18px; cursor: pointer; color: var(--text2); font-size: 13.5px;
+    transition: all .15s; border-left: 2px solid transparent;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(59,130,246,.08); }
+  .nav-item .icon { width: 16px; text-align: center; }
+
+  .sidebar-footer { padding: 14px 18px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text3); }
+  .ws-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); display: inline-block; margin-right: 6px; transition: background .3s; }
+  .ws-dot.connected { background: var(--success); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ── Main ── */
+  #main { margin-left: 220px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* ── Topbar ── */
+  #topbar {
+    height: 56px; background: var(--surface); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 24px; gap: 16px; position: sticky; top: 0; z-index: 50;
+  }
+  #topbar h1 { font-size: 15px; font-weight: 600; flex: 1; }
+  .btn {
+    padding: 7px 14px; border-radius: 7px; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; transition: all .15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text2); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: var(--danger); }
+  .btn-danger:hover { background: rgba(239,68,68,.2); }
+
+  /* ── Content ── */
+  #content { padding: 24px; flex: 1; }
+
+  /* ── Pages ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Stat cards ── */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px 20px; position: relative; overflow: hidden;
+  }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .stat-card.blue::before { background: var(--accent); }
+  .stat-card.cyan::before { background: var(--accent2); }
+  .stat-card.green::before { background: var(--success); }
+  .stat-card.amber::before { background: var(--warning); }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--text3); margin-bottom: 8px; }
+  .stat-value { font-size: 28px; font-weight: 700; line-height: 1; }
+  .stat-sub { font-size: 12px; color: var(--text2); margin-top: 6px; }
+
+  /* ── Section header ── */
+  .section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .section-header h2 { font-size: 14px; font-weight: 600; flex: 1; }
+
+  /* ── Device table ── */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--surface2); color: var(--text2); font-size: 11px; text-transform: uppercase; letter-spacing: .6px; padding: 10px 16px; text-align: left; font-weight: 500; }
+  td { padding: 12px 16px; border-top: 1px solid var(--border); color: var(--text); }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500;
+  }
+  .badge.online { background: rgba(16,185,129,.12); color: var(--success); }
+  .badge.offline { background: rgba(239,68,68,.1); color: var(--danger); }
+  .badge.inactive { background: rgba(71,85,105,.2); color: var(--text3); }
+
+  /* ── Live feed ── */
+  #live-feed {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    height: 260px; overflow-y: auto; font-family: var(--mono); font-size: 12px;
+  }
+  .feed-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text3); }
+  .feed-row {
+    padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,.03);
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .feed-row:last-child { border-bottom: none; }
+  .feed-time { color: var(--text3); min-width: 80px; }
+  .feed-type { min-width: 52px; text-align: center; border-radius: 4px; padding: 1px 6px; font-size: 10px; }
+  .feed-type.data { background: rgba(59,130,246,.15); color: var(--accent); }
+  .feed-type.status { background: rgba(16,185,129,.12); color: var(--success); }
+  .feed-body { flex: 1; color: var(--text2); word-break: break-all; }
+  .feed-body strong { color: var(--text); }
+
+  /* ── Chart card ── */
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+  .chart-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 14px; color: var(--text2); }
+  .chart-wrap { position: relative; height: 180px; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 1000;
+    display: none; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 28px; width: 480px; max-width: 95vw; box-shadow: var(--shadow);
+  }
+  .modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 6px; font-weight: 500; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px;
+    padding: 9px 12px; color: var(--text); font-size: 13px; outline: none; font-family: var(--font);
+    transition: border-color .15s;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: var(--accent); }
+  .form-group select option { background: var(--surface2); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+
+  /* ── Device detail page ── */
+  .detail-header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 24px; }
+  .detail-icon {
+    width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;
+  }
+  .detail-info h2 { font-size: 20px; font-weight: 700; }
+  .detail-info p { color: var(--text2); font-size: 13px; margin-top: 4px; }
+  .api-key-box {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 7px;
+    padding: 10px 14px; font-family: var(--mono); font-size: 12px; color: var(--accent2);
+    display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: all;
+  }
+  .api-key-box:hover { border-color: var(--accent); }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text3); }
+  .empty-state .big { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; }
+
+  /* all park */
+
+  .slot {
+    padding: 14px;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  .slot.free {
+    background: rgba(16,185,129,.1);
+    color: #10b981;
+  }
+
+  .slot.occupied {
+    background: rgba(239,68,68,.12);
+    color: #ef4444;
+  }
+
+  .slot:hover {
+    transform: scale(1.05);
+  }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 20px 0; }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; position: relative; overflow: hidden; }
+  .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+  .kpi-card.blue::before { background: var(--accent); }
+  .kpi-card.red::before { background: var(--danger); }
+  .kpi-card.green::before { background: var(--success); }
+  .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--text3); margin-bottom: 8px; }
+  .kpi-value { font-size: 32px; font-weight: 700; line-height: 1; }
+  .kpi-sub { font-size: 12px; color: var(--text2); margin-top: 6px; }
+
+  /* Lock button */
+  .lock-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text2); font-size: 11px; cursor: pointer; transition: all .15s; }
+  .lock-btn:hover { border-color: var(--warning); color: var(--warning); }
+  .lock-btn.locked { border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.1); color: var(--warning); }
+
+  /* Status pills */
+  .status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .status-pill.free { background: rgba(16,185,129,.12); color: var(--success); }
+  .status-pill.occupied { background: rgba(239,68,68,.12); color: var(--danger); }
+  .status-pill.locked { background: rgba(245,158,11,.12); color: var(--warning); }
+
+
+  @media (max-width: 900px) {
+    .chart-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside id="sidebar">
+  <div class="logo">
+    <div class="logo-icon">N</div>
+    <div>
+      <div class="logo-text">Parking Management</div>
+      <div class="logo-sub">Platform</div>
+    </div>
+  </div>
+  <nav>
+    <div class="nav-label">Main</div>
+    <div class="nav-item active" onclick="showPage('dashboard')">
+      <span class="icon">⬛</span> Dashboard
+    </div>
+    <div class="nav-item" onclick="showPage('devices')">
+      <span class="icon">📡</span> Devices
+    </div>
+    <div class="nav-label">Monitoring</div>
+    <div class="nav-item" onclick="showPage('live')">
+      <span class="icon">📶</span> Live Feed
+    </div>
+    <div class="nav-label">Developer</div>
+    <div class="nav-item" onclick="window.open('/api/docs','_blank')">
+      <span class="icon">📖</span> API Docs
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <span class="ws-dot" id="ws-dot"></span>
+    <span id="ws-status">Connecting…</span>
+  </div>
+</aside>
+
+<!-- Main -->
+<div id="main">
+  <div id="topbar">
+    <h1 id="page-title">Dashboard</h1>
+    <button class="btn btn-ghost" onclick="showLogin()" id="btn-login">🔑 Login</button>
+    <button class="btn btn-primary" onclick="openAddDevice()" id="btn-add" style="display:none">+ Add Device</button>
+    <button class="btn btn-primary" onclick="doLogout()" id="btn-logout" style="display:none"> Logout</button>
+    <span id="user-badge" style="display:none;font-size:13px;color:var(--text2)"></span>
+  </div>
+
+  <div id="content">
+
+    <!-- ── Dashboard ── -->
+  <div class="page active" id="page-dashboard">
+    <!-- KPI tổng quan -->
+    <div class="stat-grid">
+      <div class="stat-card blue">
+        <div class="stat-label">Tổng nhà xe</div>
+        <div class="stat-value" id="dash-total-devices">0</div>
+        <div class="stat-sub">Devices đã đăng ký</div>
+      </div>
+
+      <div class="stat-card cyan">
+        <div class="stat-label">Nhà xe online</div>
+        <div class="stat-value" id="dash-online-devices">0</div>
+        <div class="stat-sub">Đang kết nối</div>
+      </div>
+
+      <div class="stat-card amber">
+        <div class="stat-label">Tổng vị trí đỗ</div>
+        <div class="stat-value" id="dash-total-slots">0</div>
+        <div class="stat-sub">Toàn hệ thống</div>
+      </div>
+
+      <div class="stat-card blue">
+        <div class="stat-label">Đang có xe</div>
+        <div class="stat-value" id="dash-occupied-slots">0</div>
+        <div class="stat-sub">Slot đang sử dụng</div>
+      </div>
+
+      <div class="stat-card green">
+        <div class="stat-label">Còn trống</div>
+        <div class="stat-value" id="dash-free-slots">0</div>
+        <div class="stat-sub">Slot có thể đỗ</div>
+      </div>
+    </div>
+
+    <!-- Biểu đồ khai thác -->
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3>Tỷ lệ lấp đầy toàn hệ thống</h3>
+        <div class="chart-wrap"><canvas id="chart-occupancy-rate"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <h3>Lượt xe đỗ 30 ngày gần nhất</h3>
+        <div class="chart-wrap"><canvas id="chart-vehicle-30d"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Danh sách nhà xe -->
+    <div class="section-header" style="margin-top:20px">
+      <h2>Danh sách nhà xe</h2>
+      <button class="btn btn-ghost" onclick="loadDashboard()">Refresh</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tên nhà xe</th>
+            <th>Trạng thái</th>
+            <th>Tổng slot</th>
+            <th>Đang có xe</th>
+            <th>Còn trống</th>
+            <th>Tỷ lệ lấp đầy</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody id="dashboard-device-body">
+          <tr>
+            <td colspan="7" style="text-align:center;color:var(--text3);padding:30px">
+              Login to view dashboard
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Live events -->
+    <div class="section-header" style="margin-top:20px">
+      <h2>Live Events</h2>
+      <button class="btn btn-ghost" onclick="clearFeed()">Clear</button>
+    </div>
+
+    <div id="live-feed">
+      <div class="feed-empty" id="feed-empty">Waiting for device data…</div>
+    </div>
+  </div>
+
+
+    <!-- ── Devices ── -->
+    <div class="page" id="page-devices">
+      <div class="section-header">
+        <h2>Device Management</h2>
+        <button class="btn btn-primary" onclick="openAddDevice()">+ Add Device</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th><th>Type</th><th>Status</th><th>Last Seen</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="device-table-body">
+            <tr><td colspan="5" style="text-align:center;color:var(--text3);padding:40px">
+              Login to manage devices
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Live Feed full page ── -->
+    <div class="page" id="page-live">
+      <div class="section-header">
+        <h2>Live Event Stream</h2>
+        <button class="btn btn-ghost" onclick="clearFeed()">Clear</button>
+      </div>
+      <div id="live-feed-full" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);height:calc(100vh - 180px);overflow-y:auto;font-family:var(--mono);font-size:12px;">
+        <div class="feed-empty">Waiting for events…</div>
+      </div>
+    </div>
+
+
+    <!-- ── Device Detail ── -->
+    <div class="page" id="page-device-detail">
+      <button class="btn btn-ghost" onclick="showPage('devices')" style="margin-bottom:16px">← Back</button>
+
+      <div class="detail-header">
+        <div class="detail-icon">📡</div>
+        <div class="detail-info">
+          <h2 id="detail-name">—</h2>
+          <p id="detail-type">—</p>
+          <p id="detail-status-text" style="margin-top:6px"></p>
+        </div>
+      </div>
+
+      <div class="section-header"><h2>API Key</h2></div>
+      <div class="api-key-box" id="detail-api-key" onclick="copyApiKey()">
+        <span id="api-key-text">—</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text3)">click to copy</span>
+      </div>
+
+      <div class="section-header" style="margin-top:14px"><h2>MQTT Topic</h2></div>
+      <div class="api-key-box">
+        <span id="detail-mqtt-topic">—</span>
+      </div>
+
+      <!-- KPI: tổng / đang có xe / trống -->
+      <div class="kpi-grid">
+        <div class="kpi-card blue">
+          <div class="kpi-label">Tổng vị trí</div>
+          <div class="kpi-value" id="kpi-total">—</div>
+          <div class="kpi-sub">Tổng số chỗ đỗ</div>
+        </div>
+        <div class="kpi-card red">
+          <div class="kpi-label">Đang có xe</div>
+          <div class="kpi-value" id="kpi-occupied">—</div>
+          <div class="kpi-sub">Chỗ đang bị chiếm</div>
+        </div>
+        <div class="kpi-card green">
+          <div class="kpi-label">Còn trống</div>
+          <div class="kpi-value" id="kpi-free">—</div>
+          <div class="kpi-sub">Chỗ còn rảnh</div>
+        </div>
+      </div>
+
+      <!-- Bảng trạng thái tất cả vị trí -->
+      <div class="section-header">
+        <h2>Trạng thái bãi đỗ xe</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Tầng</th><th>Ô số</th><th>Loại</th><th>Trạng thái</th><th>Cập nhật</th><th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="detail-latest-body">
+            <tr><td colspan="6" style="color:var(--text3);text-align:center;padding:30px">No data yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Biểu đồ 30 ngày -->
+      <div class="chart-grid" style="margin-top:16px">
+        <div class="chart-card">
+          <h3>Số lượng xe đỗ — 30 ngày gần nhất</h3>
+          <div class="chart-wrap"><canvas id="detail-chart"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div>
+
+<!-- ── Add Device Modal ── -->
+<div class="modal-overlay" id="modal-device">
+  <div class="modal">
+    <h3>Add New Device</h3>
+    <div class="form-group">
+      <label>Device Name</label>
+      <input type="text" id="inp-name" placeholder="e.g. Temperature Sensor #1"/>
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <input type="text" id="inp-desc" placeholder="Optional description"/>
+    </div>
+    <div class="form-group">
+      <label>Type</label>
+      <select id="inp-type">
+        <option>sensor</option><option>actuator</option><option>gateway</option><option>generic</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-device')">Cancel</button>
+      <button class="btn btn-primary" onclick="createDevice()">Create Device</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Login Modal ── -->
+<div class="modal-overlay" id="modal-login">
+  <div class="modal">
+    <h3>Login to NexusIoT</h3>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="inp-email" placeholder="you@example.com" value="admin@nexusiot.dev"/>
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="inp-password" placeholder="••••••••" value="admin123"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-login')">Cancel</button>
+      <button class="btn btn-primary" onclick="doLogin()">Login</button>
+    </div>
+      <p style="margin-top:12px; font-size:12px; text-align:center; color:var(--text3)">
+        Don't have an account?
+        <a href="#" onclick="showRegister()">Register</a>
+      </p>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-register">
+  <div class="modal">
+    <h3>Create NexusIoT Account</h3>
+
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="reg-email" placeholder="you@example.com" />
+    </div>
+
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="reg-password" placeholder="••••••••" />
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-register')">Cancel</button>
+      <button class="btn btn-primary" onclick="doRegister()">Register</button>
+    </div>
+
+    <p style="margin-top:12px; font-size:12px; text-align:center; color:var(--text3)">
+      Already have an account?
+      <a href="#" onclick="showLogin()">Login</a>
+    </p>
+  </div>
+</div>
+
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';  // same origin
+let token = localStorage.getItem('nexus_token');
+let ws = null;
+let devices = [];
+let feedEntries = [];
+let activityChart, statusChart, detailChartInst;
+let occupancyRateChart, vehicle30dChart;
+let currentDeviceId = null;
+
+// ── Init ──────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  initCharts();
+  connectWS();
+
+  if (token) {
+    await restoreLogin();
+  } else {
+    showLoggedOutUI();
+  }
+});
+
+async function restoreLogin() {
+  try {
+    showLoggedInUI();
+    await loadDevices();    
+    await loadDashboard();
+    await loadLatestEvents(); 
+  } catch (e) {
+    localStorage.removeItem('nexus_token');
+    token = null;
+    showLoggedOutUI();
+  }
+}
+
+// ── Pages ─────────────────────────────────────────────────────────────────
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelector(`.nav-item[onclick*="${page}"]`)?.classList.add('active');
+  const titles = {dashboard:'Dashboard', devices:'Devices', live:'Live Feed'};
+  document.getElementById('page-title').textContent = titles[page] || 'NexusIoT';
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const url = `${proto}://${location.host}/ws`;
+  try {
+    ws = new WebSocket(url);
+    ws.onopen = () => setWSStatus(true);
+    ws.onclose = () => { setWSStatus(false); setTimeout(connectWS, 3000); };
+    ws.onerror = () => setWSStatus(false);
+    ws.onmessage = (e) => handleWSMessage(JSON.parse(e.data));
+  } catch(err) {
+    setWSStatus(false);
+    setTimeout(connectWS, 5000);
+  }
+}
+
+function setWSStatus(connected) {
+  document.getElementById('ws-dot').className = 'ws-dot' + (connected ? ' connected' : '');
+  document.getElementById('ws-status').textContent = connected ? 'Connected' : 'Offline';
+}
+
+function handleWSMessage(msg) {
+  addFeedEntry(msg);
+  if (msg.type === 'data') {
+    updateStatCounts();
+    if (token) {
+      loadDashboard();
+    }
+
+    const detailPageActive = document.getElementById('page-device-detail')
+                               .classList.contains('active');
+    if (detailPageActive && currentDeviceId && currentDeviceId === msg.device_id) {
+      refreshDeviceDetail(currentDeviceId);
+    }
+
+  } else if (msg.type === 'status') {
+    if (token) {
+      loadDevices().then(loadDashboard);
+    }
+    refreshDeviceTable();
+  }
+}
+
+// ── Feed ──────────────────────────────────────────────────────────────────
+function addFeedEntry(msg) {
+  const feed = document.getElementById('live-feed');
+  const feedFull = document.getElementById('live-feed-full');
+
+  feed.querySelector('.feed-empty')?.remove();
+  feedFull.querySelector('.feed-empty')?.remove();
+
+  feedEntries.unshift(msg);
+  feedEntries = feedEntries.slice(0, 20);
+
+  const row = buildFeedRow(msg);
+
+  feed.prepend(row.cloneNode(true));
+  feedFull.prepend(row);
+
+  while (feed.children.length > 20) feed.removeChild(feed.lastChild);
+  while (feedFull.children.length > 20) feedFull.removeChild(feedFull.lastChild);
+}
+
+function formatEventTime(timestamp) {
+  if (!timestamp) return '--:--:--';
+
+  const normalized = timestamp.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(timestamp)
+    ? timestamp
+    : timestamp + 'Z';
+
+  return new Date(normalized).toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+function buildFeedRow(msg) {
+  const div = document.createElement('div');
+  div.className = 'feed-row';
+  const t = formatEventTime(msg.timestamp || msg.payload?.timestamp);
+  let body = '';
+  if (msg.type === 'data') {
+  const p = msg.payload;
+  const deviceName = p.device_name || msg.device_id;
+
+  body = `<strong>${deviceName}</strong>
+    · ${p.floor} - ${p.slot_number}
+    : <strong>${p.is_occupied ? 'OCCUPIED' : 'FREE'} - 
+      ${p.locked? "Khoá": "Mở Khoá"} </strong>`;
+  } else if (msg.type === 'status') {
+    body = `<strong>${msg.payload.device_name || msg.device_id}</strong> went <strong>${msg.payload.status}</strong>`;
+  }
+  div.innerHTML = `
+    <span class="feed-time">${t}</span>
+    <span class="feed-body">${body}</span>`;
+  return div;
+}
+
+function clearFeed() {
+  feedEntries = [];
+  const feed = document.getElementById('live-feed');
+  const feedFull = document.getElementById('live-feed-full');
+  feed.innerHTML = '<div class="feed-empty" id="feed-empty">Waiting for device data…</div>';
+  feedFull.innerHTML = '<div class="feed-empty">Waiting for events…</div>';
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────
+function initCharts() {
+  const base = { color: '#94a3b8', borderColor: '#1e2d45', backgroundColor: 'transparent' };
+  const mkGrid = () => ({ grid: { color: '#1a2236' }, ticks: { color: '#475569', font: { size: 11 } } });
+
+  occupancyRateChart = new Chart(document.getElementById('chart-occupancy-rate'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Đang có xe', 'Còn trống'],
+    datasets: [{
+      data: [0, 0],
+      backgroundColor: ['#ef4444', '#10b981'],
+      borderWidth: 0,
+    }],
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          color: '#94a3b8',
+          font: { size: 12 },
+          padding: 16,
+        },
+      },
+    },
+    cutout: '65%',
+  },
+});
+
+vehicle30dChart = new Chart(document.getElementById('chart-vehicle-30d'), {
+  type: 'bar',
+  data: {
+    labels: [],
+    datasets: [{
+      label: 'Lượt xe đỗ',
+      data: [],
+      backgroundColor: 'rgba(59,130,246,.55)',
+      borderColor: '#3b82f6',
+      borderWidth: 1,
+      borderRadius: 4,
+    }],
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+    },
+    scales: {
+      x: {
+        grid: { color: '#1a2236' },
+        ticks: { color: '#475569', font: { size: 10 }, maxTicksLimit: 10 },
+      },
+      y: {
+        grid: { color: '#1a2236' },
+        ticks: { color: '#475569', font: { size: 11 }, precision: 0, stepSize: 1 },
+        beginAtZero: true,
+      },
+    },
+  },
+});
+}
+
+let eventCounts = {};
+
+// ── Auth ──────────────────────────────────────────────────────────────────
+function showLogin() { openModal('modal-login'); }
+function showRegister() {openModal('modal-register'); closeModal('modal-login'); }
+
+function showLoggedInUI() {
+  document.getElementById('btn-login').style.display = 'none';
+  document.getElementById('btn-add').style.display = 'flex';
+  document.getElementById('btn-logout').style.display = 'flex';
+
+}
+
+function showLoggedOutUI() {
+  document.getElementById('btn-login').style.display = 'flex';
+  document.getElementById('btn-add').style.display = 'none';
+  document.getElementById('btn-logout').style.display = 'none';
+}
+
+async function doLogin() {
+  const email = document.getElementById('inp-email').value;
+  const password = document.getElementById('inp-password').value;
+
+  try {
+    const res = await api('POST', '/api/v1/auth/login', { email, password }, { withToken: false });
+
+    if (!res || !res.access_token) {
+      alert("Tài khoản hoặc mật khẩu chưa đúng!");
+      return;
+    }
+
+    token = res.access_token;
+    localStorage.setItem('nexus_token', token);
+
+    closeModal('modal-login');
+    await afterLogin();
+  } catch(e) {
+    alert(e.message);
+  }
+}
+
+async function doLogout() {
+  // await showLoggedOutUI();
+  localStorage.removeItem('nexus_token');
+  token = null
+  window.location.reload();
+  
+}
+
+async function doRegister() {
+  const email = document.getElementById('inp-email').value;
+  const password = document.getElementById('inp-password').value;
+  const username = email.split('@')[0];
+  try {
+    await api('POST', '/api/v1/auth/register', { email, username, password }, false);
+    alert("Đăng ký thành công, vui lòng đăng nhập!");
+    closeModal('modal-register')
+  } catch(e) {
+    alert(e.message);
+  }
+}
+
+async function afterLogin() {
+  showLoggedInUI();
+
+  try {
+    await loadDevices();
+   await loadDashboard();
+   await loadLatestEvents();
+  } catch (e) {
+    console.error('Restore session failed:', e);
+
+    localStorage.removeItem('nexus_token');
+    token = null;
+    showLoggedOutUI();
+  }
+}
+
+// ── Devices ───────────────────────────────────────────────────────────────
+async function loadDevices() {
+  try {
+    devices = await api('GET', '/api/v1/devices');
+    refreshDeviceTable();
+  } catch(e) { /* not logged in */ }
+}
+
+function refreshDeviceTable() {
+  const tbody = document.getElementById('device-table-body');
+  if (!devices.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:40px">No devices yet. Add your first device!</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = devices.map(d => `
+    <tr>
+      <td><strong style="cursor:pointer;color:var(--accent)" onclick="openDeviceDetail('${d.id}')">${d.name}</strong></td>
+      <td style="color:var(--text2)">${d.device_type}</td>
+      <td>
+        ${d.is_active
+          ? `<span class="badge ${d.is_online ? 'online' : 'offline'}">${d.is_online ? '● Online' : '○ Offline'}</span>`
+          : `<span class="badge inactive">Disabled</span>`}
+      </td>
+      <td style="color:var(--text2);font-size:12px">${d.last_seen ? new Date(d.last_seen).toLocaleString() : 'Never'}</td>
+      <td>
+        <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="openDeviceDetail('${d.id}')">View</button>
+        <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;margin-left:6px" onclick="deleteDevice('${d.id}','${d.name}')">Delete</button>
+      </td>
+    </tr>`).join('');
+}
+
+function openAddDevice() { openModal('modal-device'); }
+
+async function createDevice() {
+  const name = document.getElementById('inp-name').value.trim();
+  if (!name)  return; 
+  try {
+    const d = await api('POST', '/api/v1/devices', {
+      name,
+      description: document.getElementById('inp-desc').value,
+      device_type: document.getElementById('inp-type').value,
+    });
+    devices.unshift(d);
+    closeModal('modal-device');
+    refreshDeviceTable();
+    openDeviceDetail(d.id);
+  } catch(e) {
+  }
+}
+
+async function deleteDevice(id, name) {
+  if (!confirm(`Delete device "${name}"? This will also delete all its data.`)) return;
+  try {
+    await api('DELETE', `/api/v1/devices/${id}`);
+    devices = devices.filter(d => d.id !== id);
+    refreshDeviceTable();
+    alert('Device deleted');
+    showPage('devices');
+  } catch(e) {
+    alert(e.message);
+  }
+}
+
+// ── Device Detail ─────────────────────────────────────────────────────────
+async function openDeviceDetail(id) {
+  currentDeviceId = id;
+  const d = devices.find(x => x.id === id);
+  if (!d) return;
+
+  document.getElementById('detail-name').textContent = d.name;
+  document.getElementById('detail-type').textContent = `Type: ${d.device_type}  ·  ID: ${d.id}`;
+  document.getElementById('detail-status-text').innerHTML =
+    `<span class="badge ${d.is_online ? 'online' : 'offline'}">${d.is_online ? '● Online' : '○ Offline'}</span>`;
+  document.getElementById('api-key-text').textContent = d.api_key;
+  document.getElementById('detail-mqtt-topic').textContent = d.mqtt_topic;
+
+  showPage('device-detail');
+  document.getElementById('page-title').textContent = d.name;
+  await refreshDeviceDetail(id);
+}
+
+async function refreshDeviceDetail(id) {
+  try {
+    const data = await api('GET', `/api/v1/data/${id}/latest`);
+    const tbody = document.getElementById('detail-latest-body');
+
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="color:var(--text3);text-align:center;padding:20px">No data yet</td></tr>`;
+      document.getElementById('kpi-total').textContent = '0';
+      document.getElementById('kpi-occupied').textContent = '0';
+      document.getElementById('kpi-free').textContent = '0';
+      return;
+    }
+
+    let occupied = 0;
+    let free = 0;
+
+    tbody.innerHTML = data.map(r => {
+      const locked = r.locked === true;
+
+      let pillHtml;
+      if (r.is_occupied) {
+        occupied++;
+        pillHtml = `<span class="status-pill occupied">● Có xe</span>`;
+      } else {
+        free++;
+        pillHtml = `<span class="status-pill free">● Trống</span>`;
+      }
+
+
+      const btnHtml = !locked
+        ? `<button id = "btn-${r.slot_number}" class="lock-btn unlock" onclick="toggleSlotLock('${id}', '${r.slot_number}', true)">Mở khoá</button>`
+        : `<button id = "btn-${r.slot_number}" class="lock-btn" onclick="toggleSlotLock('${id}', '${r.slot_number}', false)">Khoá</button>`;
+
+      return `<tr>
+        <td>${r.floor ?? '-'}</td>
+        <td><strong>${r.slot_number ?? '-'}</strong></td>
+        <td style="color:var(--text2)">${r.type ?? '-'}</td>
+        <td>${pillHtml}</td>
+        <td style="color:var(--text3);font-size:12px">
+          ${r.timestamp ? new Date(r.timestamp).toLocaleString() : '-'}
+        </td>
+        <td>${btnHtml}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('kpi-total').textContent = free + occupied;
+    document.getElementById('kpi-occupied').textContent = occupied;
+    document.getElementById('kpi-free').textContent = free;
+
+    await loadDetailChart(id, 'is_occupied');
+  } catch (e) {
+    console.error('Failed to load device detail:', e);
+  }
+}
+
+
+async function loadDetailChart(deviceId, field) {
+  try {
+    const history = await api(
+      'GET',
+      `/api/v1/data/${deviceId}/history?field=${field}`
+    );
+
+    const now = new Date();
+    const startDate = new Date(now);
+    startDate.setDate(now.getDate() - 29);
+    startDate.setHours(0, 0, 0, 0);
+
+    const dailyCounts = {};
+    const slotStates = {};
+
+    // Khởi tạo đủ 30 ngày gần nhất
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(startDate);
+      d.setDate(startDate.getDate() + i);
+
+      const dayKey = d.toISOString().slice(0, 10);
+
+      dailyCounts[dayKey] = {
+        date: d,
+        count: 0,
+      };
+    }
+
+    history
+      .slice()
+      .filter(r => {
+        const d = new Date(r.date ?? r.timestamp);
+        return !Number.isNaN(d.getTime()) && d >= startDate && d <= now;
+      })
+      .sort((a, b) => {
+        const slotA = Number(a.slot_number ?? 0);
+        const slotB = Number(b.slot_number ?? 0);
+
+        if (slotA !== slotB) return slotA - slotB;
+
+        return new Date(a.date ?? a.timestamp) - new Date(b.date ?? b.timestamp);
+      })
+      .forEach(r => {
+        const d = new Date(r.date ?? r.timestamp);
+        const dayKey = d.toISOString().slice(0, 10);
+        const slotNumber = r.slot_number;
+
+        if (!dailyCounts[dayKey] || slotNumber == null) return;
+
+        const occupied = r.is_occupied === true;
+        const prevOccupied = slotStates[slotNumber] ?? false;
+
+        // Trống -> có xe: tính là 1 lượt xe đỗ
+        if (occupied && prevOccupied === false) {
+          dailyCounts[dayKey].count += 1;
+        }
+
+        slotStates[slotNumber] = occupied;
+      });
+
+    const chartData = Object.values(dailyCounts);
+
+    document.getElementById('detail-chart-title')?.remove();
+    if (detailChartInst) detailChartInst.destroy();
+
+    detailChartInst = new Chart(document.getElementById('detail-chart'), {
+      type: 'bar',
+      data: {
+        labels: chartData.map(r =>
+          r.date.toLocaleDateString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit',
+          })
+        ),
+        datasets: [{
+          label: 'Số xe đỗ/ngày',
+          data: chartData.map(r => r.count),
+          backgroundColor: 'rgba(59,130,246,.55)',
+          borderColor: '#3b82f6',
+          borderWidth: 1,
+          borderRadius: 4,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+        },
+        scales: {
+          x: {
+            grid: { color: '#1a2236' },
+            ticks: {
+              color: '#475569',
+              font: { size: 10 },
+              maxTicksLimit: 10,
+            },
+          },
+          y: {
+            grid: { color: '#1a2236' },
+            ticks: {
+              color: '#475569',
+              font: { size: 11 },
+              precision: 0,
+              stepSize: 1,
+            },
+            beginAtZero: true,
+          },
+        },
+      },
+    });
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function toggleSlotLock(deviceId, slotNumber, locked) {
+  try {
+    await api('POST', `/api/v1/devices/${deviceId}/command/lock`, {
+      slot_number: slotNumber,
+      locked,
+    });
+    const btn = document.getElementById(`btn-${slotNumber}`);
+    if (btn) {
+      btn.textContent = locked ? "Khoá" : "Mở Khoá";
+      btn.className = `lock-btn ${locked ? 'lock' : 'unlock'}`;
+      btn.setAttribute("onclick", `toggleSlotLock('${deviceId}', '${slotNumber}', ${!locked})`);
+    }
+    // await sleep(2000);
+    // await refreshDeviceDetail(deviceId);
+  } catch (e) {
+    alert("Nguy hiem");
+  }
+}
+
+
+
+function copyApiKey() {
+  const key = document.getElementById('api-key-text').textContent;
+  navigator.clipboard.writeText(key);
+}
+
+// ── API helper ────────────────────────────────────────────────────────────
+async function api(method, path, body, options = {}) {
+  const { withToken = true, apiKey = null } = options;
+
+  const headers = { 'Content-Type': 'application/json' };
+
+  if (withToken && token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  if (apiKey) {
+    headers['apiKey'] = apiKey;
+  }
+
+  const res = await fetch(API + path, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (res.status === 204) return null;
+
+  const data = await res.json().catch(() => ({}));
+
+  if (res.status === 401) {
+    localStorage.removeItem('nexus_token');
+    token = null;
+    showLoggedOutUI();
+    throw new Error(data.detail || 'Unauthorized');
+  }
+
+  if (!res.ok) {
+    throw new Error(data.detail || 'Request failed');
+  }
+
+  return data;
+}
+
+async function loadDashboard() {
+  if (!token) return;
+
+  const summaries = [];
+
+  for (const d of devices) {
+    try {
+      const latest = await api('GET', `/api/v1/data/${d.id}/latest`);
+
+      const totalSlots = latest.length;
+      const occupiedSlots = latest.filter(r => r.is_occupied === true).length;
+      const freeSlots = totalSlots - occupiedSlots;
+
+      summaries.push({
+        device_id: d.id,
+        name: d.name,
+        is_online: d.is_online,
+        is_active: d.is_active,
+        totalSlots,
+        occupiedSlots,
+        freeSlots,
+        latest,
+      });
+    } catch (e) {
+      // console.error('Failed to load dashboard device:', d.id, e);
+
+      summaries.push({
+        device_id: d.id,
+        name: d.name,
+        is_online: d.is_online,
+        is_active: d.is_active,
+        totalSlots: 0,
+        occupiedSlots: 0,
+        freeSlots: 0,
+        latest: [],
+      });
+    }
+  }
+
+  renderDashboard(summaries);
+  renderDashboardCharts(summaries);
+  await renderVehicle30dChart();
+}
+
+function renderDashboard(summaries) {
+  const totalDevices = devices.length;
+  const onlineDevices = devices.filter(d => d.is_online && d.is_active).length;
+  const totalSlots = summaries.reduce((sum, d) => sum + d.totalSlots, 0);
+  const occupiedSlots = summaries.reduce((sum, d) => sum + d.occupiedSlots, 0);
+  const freeSlots = summaries.reduce((sum, d) => sum + d.freeSlots, 0);
+
+  document.getElementById('dash-total-devices').textContent = totalDevices;
+  document.getElementById('dash-online-devices').textContent = onlineDevices;
+  document.getElementById('dash-total-slots').textContent = totalSlots;
+  document.getElementById('dash-occupied-slots').textContent = occupiedSlots;
+  document.getElementById('dash-free-slots').textContent = freeSlots;
+
+  const tbody = document.getElementById('dashboard-device-body');
+
+  if (!summaries.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center;color:var(--text3);padding:30px">
+          No parking devices yet
+        </td>
+      </tr>`;
+    return;
+  }
+
+  tbody.innerHTML = summaries.map(d => {
+    const rate = d.totalSlots > 0
+      ? Math.round((d.occupiedSlots / d.totalSlots) * 100)
+      : 0;
+
+    return `
+      <tr>
+        <td>
+          <strong style="cursor:pointer;color:var(--accent)"
+            onclick="openDeviceDetail('${d.device_id}')">
+            ${d.name}
+          </strong>
+        </td>
+        <td>
+          ${d.is_active
+            ? `<span class="badge ${d.is_online ? 'online' : 'offline'}">${d.is_online ? '● Online' : '○ Offline'}</span>`
+            : `<span class="badge inactive">Disabled</span>`}
+        </td>
+        <td>${d.totalSlots}</td>
+        <td style="color:var(--danger);font-weight:600">${d.occupiedSlots}</td>
+        <td style="color:var(--success);font-weight:600">${d.freeSlots}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="height:6px;width:90px;background:var(--surface2);border-radius:10px;overflow:hidden">
+              <div style="height:100%;width:${rate}%;background:${rate >= 85 ? 'var(--danger)' : rate >= 60 ? 'var(--warning)' : 'var(--success)'}"></div>
+            </div>
+            <span style="color:var(--text2);font-size:12px">${rate}%</span>
+          </div>
+        </td>
+        <td>
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px"
+            onclick="openDeviceDetail('${d.device_id}')">
+            View
+          </button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function getLocalDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function renderDashboardCharts(summaries) {
+  if (!occupancyRateChart) return;
+
+  const occupiedSlots = summaries.reduce((sum, d) => sum + Number(d.occupiedSlots || 0), 0);
+  const freeSlots = summaries.reduce((sum, d) => sum + Number(d.freeSlots || 0), 0);
+  const totalSlots = occupiedSlots + freeSlots;
+
+  if (totalSlots === 0) {
+    occupancyRateChart.data.labels = ['Chưa có dữ liệu'];
+    occupancyRateChart.data.datasets[0].data = [1];
+    occupancyRateChart.data.datasets[0].backgroundColor = ['#475569'];
+  } else {
+    occupancyRateChart.data.labels = ['Đang có xe', 'Còn trống'];
+    occupancyRateChart.data.datasets[0].data = [occupiedSlots, freeSlots];
+    occupancyRateChart.data.datasets[0].backgroundColor = ['#ef4444', '#10b981'];
+  }
+
+  occupancyRateChart.update();
+}
+
+async function renderVehicle30dChart() {
+  if (!vehicle30dChart) return;
+
+  const now = new Date();
+  const startDate = new Date(now);
+  startDate.setDate(now.getDate() - 29);
+  startDate.setHours(0, 0, 0, 0);
+
+  const dailyCounts = {};
+
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+
+    dailyCounts[getLocalDateKey(d)] = {
+      date: d,
+      count: 0,
+    };
+  }
+
+  for (const device of devices) {
+    try {
+      const history = await api(
+        'GET',
+        `/api/v1/data/${device.id}/history?field=is_occupied`
+      );
+
+      const slotStates = {};
+
+      history
+        .slice()
+        .filter(r => {
+          const d = new Date(r.timestamp ?? r.date);
+          return !Number.isNaN(d.getTime()) && d >= startDate && d <= now;
+        })
+        .sort((a, b) => {
+          const slotA = String(a.slot_number ?? '');
+          const slotB = String(b.slot_number ?? '');
+
+          if (slotA !== slotB) return slotA.localeCompare(slotB);
+
+          return new Date(a.timestamp ?? a.date) - new Date(b.timestamp ?? b.date);
+        })
+        .forEach(r => {
+          const d = new Date(r.timestamp ?? r.date);
+          const dayKey = getLocalDateKey(d);
+          const slotKey = `${device.id}:${r.slot_number}`;
+
+          if (!dailyCounts[dayKey] || r.slot_number == null) return;
+
+          const occupied = r.is_occupied === true;
+          const prevOccupied = slotStates[slotKey] ?? false;
+
+          if (occupied && prevOccupied === false) {
+            dailyCounts[dayKey].count += 1;
+          }
+
+          slotStates[slotKey] = occupied;
+        });
+    } catch (e) {
+      console.error('Failed to load 30d chart:', device.id, e);
+    }
+  }
+
+  const chartData = Object.values(dailyCounts);
+
+  vehicle30dChart.data.labels = chartData.map(r =>
+    r.date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+    })
+  );
+
+  vehicle30dChart.data.datasets[0].data = chartData.map(r => r.count);
+  vehicle30dChart.update();
+}
+
+
+// ── UI helpers ────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+let toastTimer;
+function showToast(msg, type = 'success', dur = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), dur);
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+
+//------live event----
+async function loadLatestEvents() {
+  if (!token) return;
+
+  try {
+    const events = await api('GET', '/api/v1/data/latest-event?limit=20');
+
+    feedEntries = [];
+
+    const feed = document.getElementById('live-feed');
+    const feedFull = document.getElementById('live-feed-full');
+
+    feed.innerHTML = '';
+    feedFull.innerHTML = '';
+
+    if (!events.length) {
+      feed.innerHTML = '<div class="feed-empty" id="feed-empty">Waiting for device data…</div>';
+      feedFull.innerHTML = '<div class="feed-empty">Waiting for events…</div>';
+      return;
+    }
+
+    events.forEach(msg => {
+      feedEntries.push(msg);
+      const row = buildFeedRow(msg);
+
+      feed.appendChild(row.cloneNode(true));
+      feedFull.appendChild(row);
+    });
+  } catch (e) {
+    console.error('Failed to load latest events:', e);
+  }
+}
+
+
+</script>
+</body>
+</html>
