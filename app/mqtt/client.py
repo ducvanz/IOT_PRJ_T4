@@ -120,6 +120,8 @@ class MQTTManager:
                 await ingest_data(db, device, reading)
 
             await db.commit()
+            logger.info(
+            "Dữ liệu nhận đã cập nhật lên db")
             # schedule_push_with_data()
 
     async def _process_status(self, device_id: str, data: dict):

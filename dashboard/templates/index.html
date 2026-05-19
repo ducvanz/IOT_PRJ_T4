@@ -1132,8 +1132,8 @@ async function toggleSlotLock(deviceId, slotNumber, locked) {
       btn.className = `lock-btn ${locked ? 'lock' : 'unlock'}`;
       btn.setAttribute("onclick", `toggleSlotLock('${deviceId}', '${slotNumber}', ${!locked})`);
     }
-    // await sleep(2000);
-    // await refreshDeviceDetail(deviceId);
+    await sleep(5000);
+    await refreshDeviceDetail(deviceId);
   } catch (e) {
     alert("Nguy hiem");
   }
