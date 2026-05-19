@@ -635,7 +635,6 @@ function setWSStatus(connected) {
 function handleWSMessage(msg) {
   addFeedEntry(msg);
   if (msg.type === 'data') {
-    updateStatCounts();
     if (token) {
       loadDashboard();
     }
@@ -870,12 +869,14 @@ async function loadDevices() {
   } catch(e) { /* not logged in */ }
 }
 
+
 function refreshDeviceTable() {
   const tbody = document.getElementById('device-table-body');
   if (!devices.length) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:40px">No devices yet. Add your first device!</td></tr>`;
     return;
   }
+
   tbody.innerHTML = devices.map(d => `
     <tr>
       <td><strong style="cursor:pointer;color:var(--accent)" onclick="openDeviceDetail('${d.id}')">${d.name}</strong></td>
@@ -885,7 +886,9 @@ function refreshDeviceTable() {
           ? `<span class="badge ${d.is_online ? 'online' : 'offline'}">${d.is_online ? '● Online' : '○ Offline'}</span>`
           : `<span class="badge inactive">Disabled</span>`}
       </td>
-      <td style="color:var(--text2);font-size:12px">${d.last_seen ? new Date(d.last_seen).toLocaleString() : 'Never'}</td>
+    <td style="color:var(--text2);font-size:12px">
+      ${d.last_seen ? formatEventTime(d.last_seen) : 'Never'}
+    </td>
       <td>
         <button class="btn btn-ghost" style="padding:5px 10px;font-size:12px" onclick="openDeviceDetail('${d.id}')">View</button>
         <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;margin-left:6px" onclick="deleteDevice('${d.id}','${d.name}')">Delete</button>
@@ -982,7 +985,7 @@ async function refreshDeviceDetail(id) {
         <td style="color:var(--text2)">${r.type ?? '-'}</td>
         <td>${pillHtml}</td>
         <td style="color:var(--text3);font-size:12px">
-          ${r.timestamp ? new Date(r.timestamp).toLocaleString() : '-'}
+          ${r.timestamp ? formatEventTime(r.timestamp): '-'}
         </td>
         <td>${btnHtml}</td>
       </tr>`;
@@ -1132,8 +1135,8 @@ async function toggleSlotLock(deviceId, slotNumber, locked) {
       btn.className = `lock-btn ${locked ? 'lock' : 'unlock'}`;
       btn.setAttribute("onclick", `toggleSlotLock('${deviceId}', '${slotNumber}', ${!locked})`);
     }
-    await sleep(5000);
-    await refreshDeviceDetail(deviceId);
+    // await sleep(1200);
+    // await refreshDeviceDetail(deviceId);
   } catch (e) {
     alert("Nguy hiem");
   }

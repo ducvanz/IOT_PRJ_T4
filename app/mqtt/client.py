@@ -91,6 +91,7 @@ class MQTTManager:
         from app.services.sensor_service import ingest_data, ingest_bulk
         from sqlalchemy import select
         from app.services.external import schedule_push_with_data
+        from app.services.websocket_manager import ws_manager
 
         logger.info(
             "MQTT data received | device_id=%s | payload=%s",
@@ -120,6 +121,8 @@ class MQTTManager:
                 await ingest_data(db, device, reading)
 
             await db.commit()
+            msg = ws_manager.make_payload("data", device_id, data)
+            await ws_manager.broadcast(msg)
             logger.info(
             "Dữ liệu nhận đã cập nhật lên db")
             # schedule_push_with_data()
