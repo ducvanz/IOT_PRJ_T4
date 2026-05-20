@@ -90,7 +90,6 @@ class MQTTManager:
         from app.schemas.schemas import SensorDataIngest
         from app.services.sensor_service import ingest_data, ingest_bulk
         from sqlalchemy import select
-        # from app.services.external import schedule_push_with_data
         from app.services.websocket_manager import ws_manager
 
         logger.info(
@@ -109,30 +108,38 @@ class MQTTManager:
 
             if not device.is_active:
                 return
-            logger.info(
-            "Dữ liệu trước khi chạm db")
+            
+            # Khởi tạo danh sách tin nhắn sẽ gửi qua WebSocket
+            ws_messages = []
 
             if "readings" in data:
                 readings = data["readings"]
-
                 parsed = [SensorDataIngest(**r) for r in readings]
-
                 await ingest_bulk(db, device, parsed)
+                
+                # SỬA LỖI: Gom từng phần tử đã bóc tách vào danh sách tin nhắn gửi đi
+                for r in readings:
+                    # Gán thêm api_key hoặc device_name nếu FE của bạn cần dùng
+                    r["api_key"] = data.get("api_key")
+                    r["device_name"] = device.name
+                    single_msg = ws_manager.make_payload("data", device_id, r)
+                    ws_messages.append(single_msg)
             else:
                 reading = SensorDataIngest(**data)
                 await ingest_data(db, device, reading)
-            logger.info(
-            "Nếu ws lỗi")
-            msg = ws_manager.make_payload("data", device_id, data)
-            await ws_manager.broadcast(msg)
-            logger.info(
-            "Dữ liệu đã gửi lên ws")
+                
+                # Trường hợp gói tin đơn lẻ thông thường
+                data["device_name"] = device.name
+                single_msg = ws_manager.make_payload("data", device_id, data)
+                ws_messages.append(single_msg)
+
             await db.commit()
-            # msg = ws_manager.make_payload("data", device_id, data)
-            # await ws_manager.broadcast(msg)
-            logger.info(
-            "Dữ liệu nhận đã cập nhật lên db")
-            # schedule_push_with_data()
+            
+            # SỬA LỖI: Chỉ broadcast những gói tin đã được bóc tách chuẩn (Không gửi cục thô chứa mảng nữa)
+            # for msg in ws_messages:
+            #     await ws_manager.broadcast(msg)
+                
+            logger.info("Dữ liệu nhận đã cập nhật lên db và phát qua WebSocket")
 
     async def _process_status(self, device_id: str, data: dict):
         """Handle device online/offline status"""

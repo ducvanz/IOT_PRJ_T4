@@ -655,6 +655,10 @@ function handleWSMessage(msg) {
 
 // ── Feed ──────────────────────────────────────────────────────────────────
 function addFeedEntry(msg) {
+  // alert("Dữ liệu chạy vào addFeedEntry:\n" + JSON.stringify(msg, null, 2));
+  if (!msg || msg.readings) {
+    return; // Thoát hàm ngay lập tức
+  }
   const feed = document.getElementById('live-feed');
   const feedFull = document.getElementById('live-feed-full');
 

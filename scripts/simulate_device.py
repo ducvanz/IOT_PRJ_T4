@@ -1,125 +1,118 @@
 import json
 import time
 import threading
+import ssl
 import paho.mqtt.client as mqtt
 
-BROKER = "127.0.0.1"
-DEVICE_ID = "87b1d353-5804-47c7-99cc-7723506c364b"
+# ── Cấu hình MQTT (giống ESP32) ──────────────────────────────────────────────
+BROKER   = "9728affa3bc64fcc98b13435c136926c.s1.eu.hivemq.cloud"
+PORT     = 8883                          # TLS, giống ESP32
+MQTT_NAME = "bailongbien"
+MQTT_PASS = "Maiducvan112@##"
 
-DATA_TOPIC = f"devices/{DEVICE_ID}/data"
+DEVICE_ID     = "a207aa27-3894-4aa3-b32f-2029882971ac"
+DATA_TOPIC    = f"devices/{DEVICE_ID}/data"
 COMMAND_TOPIC = f"devices/{DEVICE_ID}/command"
-
-API_KEY = "nxs_rMk5Ttt0v22afieuciwtJcOyGraJcnUHaXjtvOKZ4Tg"
-
-# False = free, True = occupied
-slots = {f"A{i}": False for i in range(1, 21)}
-
-# False = unlocked, True = locked
-locks = {f"A{i}": True for i in range(1, 21)}
-
-client = mqtt.Client()
-
-
+API_KEY       = "nxs_cOutzMXF3MtBICw2E5mKUNDgty4vJx8g1uW6OHGrU9Q"
+# ── Trạng thái bãi đỗ — chỉ theo dõi xe, khoá luôn True ─────────────────────
+slots = {f"A{i}": False for i in range(1, 21)}  # False = trống, True = có xe
+ 
+# ── MQTT client ───────────────────────────────────────────────────────────────
+client = mqtt.Client(client_id=DEVICE_ID)
+client.username_pw_set(MQTT_NAME, MQTT_PASS)
+client.tls_set(cert_reqs=ssl.CERT_NONE)
+client.tls_insecure_set(True)
+ 
+ 
+# ── Publish dữ liệu một slot ──────────────────────────────────────────────────
 def publish(slot_id):
     msg = {
         "api_key": API_KEY,
         "readings": [
             {
-                "floor": "F1",
+                "floor":       "F1",
                 "slot_number": slot_id,
                 "is_occupied": slots[slot_id],
-                "type": "car",
-                "locked": locks[slot_id],
+                "type":        "car",
+                "locked":      True,   # cố định, không thay đổi
             }
         ],
     }
-
     client.publish(DATA_TOPIC, json.dumps(msg))
-    print("SENT DATA:", msg)
-
-
-def toggle(slot_id):
-    old = slots[slot_id]
-    slots[slot_id] = not old
-
-    # gửi khi trạng thái xe thay đổi
-    publish(slot_id)
-
-
-def apply_lock_command(slot_id, locked):
-    if slot_id not in locks:
-        print("UNKNOWN SLOT:", slot_id)
-        return
-
-    old = locks[slot_id]
-    locks[slot_id] = locked
-
-    print(f"LOCK CHANGED: {slot_id} {old} -> {locked}")
-
-    publish(slot_id)
-
-
+    print(f"[MQTT] SENT → {msg}")
+ 
+ 
+# ── Callbacks MQTT ────────────────────────────────────────────────────────────
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
-        print("MQTT CONNECTED")
+        print(f"[WiFi] Đã kết nối {BROKER}:{PORT}")
         client.subscribe(COMMAND_TOPIC)
-        print("SUBSCRIBED:", COMMAND_TOPIC)
+        print(f"[MQTT] Subscribed → {COMMAND_TOPIC}")
+        for slot_id in slots:
+            publish(slot_id)
     else:
-        print("MQTT CONNECT FAILED:", rc)
-
-
+        print(f"[MQTT] Kết nối thất bại, rc={rc}")
+ 
+ 
 def on_message(client, userdata, msg):
+    # Nhận lệnh từ server nhưng không thay đổi trạng thái khoá
     try:
         payload = json.loads(msg.payload.decode("utf-8"))
-        print("RECEIVED COMMAND:", msg.topic, payload)
-
-        slot_id = payload.get("slot_number")
-        locked = payload.get("locked")
-
-        if slot_id is None or locked is None:
-            print("INVALID COMMAND PAYLOAD")
-            return
-
-        apply_lock_command(slot_id, bool(locked))
-
+        print(f"[MQTT] RECV ← {payload} (lệnh khoá bị bỏ qua)")
     except Exception as e:
-        print("COMMAND ERROR:", e)
-
-
+        print(f"[CMD] Lỗi: {e}")
+ 
+ 
+def on_disconnect(client, userdata, rc):
+    print(f"[MQTT] Ngắt kết nối (rc={rc})")
+ 
+ 
+# ── CLI ───────────────────────────────────────────────────────────────────────
 def print_ui():
-    print("\nPARKING STATUS")
-    print("-" * 50)
-    for i in range(1, 21):
-        s = f"A{i}"
-        status = "OCC" if slots[s] else "FREE"
-        lock_status = "LOCKED" if locks[s] else "UNLOCKED"
-        print(f"{s}: {status:<4} | {lock_status}")
-    print("-" * 50)
-
-
-def loop():
+    print("\n╔══════════════ PARKING STATUS ══════════════╗")
+    keys = [f"A{i}" for i in range(1, 21)]
+    for row_start in range(0, 20, 4):
+        row = keys[row_start:row_start + 4]
+        line = "║  " + "   ".join(
+            f"{s}:{'●' if slots[s] else '○'}" for s in row
+        )
+        print(line.ljust(45) + "║")
+    print("╚════════════════════════════════════════════╝")
+    print("Lệnh: [A1–A20] toggle xe  |  [Q] thoát")
+ 
+ 
+def toggle_slot(slot_id):
+    slots[slot_id] = not slots[slot_id]
+    state = "CÓ XE" if slots[slot_id] else "TRỐNG"
+    print(f"[SENSOR] Slot {slot_id} → {state}")
+    publish(slot_id)
+ 
+ 
+def cli_loop():
     while True:
         print_ui()
-        cmd = input("Toggle slot (A1-A20) or q: ").strip().upper()
-
+        cmd = input(">> ").strip().upper()
         if cmd == "Q":
             break
-
         if cmd in slots:
-            toggle(cmd)
-
-
+            toggle_slot(cmd)
+        else:
+            print("[CLI] Lệnh không hợp lệ.")
+ 
+ 
+# ── Main ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    client.on_connect = on_connect
-    client.on_message = on_message
-
-    client.connect(BROKER, 1883, 60)
-
-    # chạy MQTT background để vừa nhận command vừa nhập input
+    client.on_connect    = on_connect
+    client.on_message    = on_message
+    client.on_disconnect = on_disconnect
+ 
+    print(f"[SYS] Đang kết nối {BROKER}:{PORT} ...")
+    client.connect(BROKER, PORT, keepalive=60)
     client.loop_start()
-
+ 
     try:
-        loop()
+        cli_loop()
     finally:
         client.loop_stop()
         client.disconnect()
+        print("[SYS] Đã ngắt kết nối.")
