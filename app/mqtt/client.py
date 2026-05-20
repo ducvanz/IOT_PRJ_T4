@@ -119,10 +119,13 @@ class MQTTManager:
             else:
                 reading = SensorDataIngest(**data)
                 await ingest_data(db, device, reading)
-
-            await db.commit()
             msg = ws_manager.make_payload("data", device_id, data)
             await ws_manager.broadcast(msg)
+            logger.info(
+            "Dữ liệu đã gửi lên ws")
+            await db.commit()
+            # msg = ws_manager.make_payload("data", device_id, data)
+            # await ws_manager.broadcast(msg)
             logger.info(
             "Dữ liệu nhận đã cập nhật lên db")
             # schedule_push_with_data()
