@@ -109,6 +109,8 @@ class MQTTManager:
 
             if not device.is_active:
                 return
+            logger.info(
+            "Dữ liệu trước khi chạm db")
 
             if "readings" in data:
                 readings = data["readings"]
@@ -119,6 +121,8 @@ class MQTTManager:
             else:
                 reading = SensorDataIngest(**data)
                 await ingest_data(db, device, reading)
+            logger.info(
+            "Nếu ws lỗi")
             msg = ws_manager.make_payload("data", device_id, data)
             await ws_manager.broadcast(msg)
             logger.info(
