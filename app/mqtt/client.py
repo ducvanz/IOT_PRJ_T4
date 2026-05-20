@@ -90,7 +90,7 @@ class MQTTManager:
         from app.schemas.schemas import SensorDataIngest
         from app.services.sensor_service import ingest_data, ingest_bulk
         from sqlalchemy import select
-        from app.services.external import schedule_push_with_data
+        # from app.services.external import schedule_push_with_data
         from app.services.websocket_manager import ws_manager
 
         logger.info(
@@ -140,7 +140,7 @@ class MQTTManager:
         from app.services.websocket_manager import ws_manager
         from sqlalchemy import select
         from datetime import datetime, timezone
-        from app.services.external import schedule_push_with_data
+        # from app.services.external import schedule_push_with_data
 
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(Device).where(Device.id == device_id))
