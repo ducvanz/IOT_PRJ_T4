@@ -134,7 +134,7 @@ async def get_history(
     device_id: str,
     start: Optional[datetime] = None,
     end: Optional[datetime] = None,
-    limit: int = 100,
+    limit: int = 1000,
 ) -> list[SensorData]:
     """Get historical readings for a device"""
     conditions = [SensorData.device_id == device_id]

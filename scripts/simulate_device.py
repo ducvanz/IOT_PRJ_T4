@@ -7,15 +7,15 @@ import paho.mqtt.client as mqtt
 # ── Cấu hình MQTT (giống ESP32) ──────────────────────────────────────────────
 BROKER   = "9728affa3bc64fcc98b13435c136926c.s1.eu.hivemq.cloud"
 PORT     = 8883                          # TLS, giống ESP32
-MQTT_NAME = "bailongbien"
+MQTT_NAME = "baicaugiay"
 MQTT_PASS = "Maiducvan112@##"
 
-DEVICE_ID     = "a207aa27-3894-4aa3-b32f-2029882971ac"
+DEVICE_ID     = "535eb5cf-00b3-466f-82a3-097ab90709bc"
 DATA_TOPIC    = f"devices/{DEVICE_ID}/data"
 COMMAND_TOPIC = f"devices/{DEVICE_ID}/command"
-API_KEY       = "nxs_cOutzMXF3MtBICw2E5mKUNDgty4vJx8g1uW6OHGrU9Q"
+API_KEY       = "nxs_5kEEfxW-CDItKDcJHwF_xxLPbhJSMk88DCdYeN1llOo"
 # ── Trạng thái bãi đỗ — chỉ theo dõi xe, khoá luôn True ─────────────────────
-slots = {f"A{i}": False for i in range(1, 21)}  # False = trống, True = có xe
+slots = {f"A{i}": False for i in range(1, 41)}  # False = trống, True = có xe
  
 # ── MQTT client ───────────────────────────────────────────────────────────────
 client = mqtt.Client(client_id=DEVICE_ID)
@@ -70,8 +70,8 @@ def on_disconnect(client, userdata, rc):
 # ── CLI ───────────────────────────────────────────────────────────────────────
 def print_ui():
     print("\n╔══════════════ PARKING STATUS ══════════════╗")
-    keys = [f"A{i}" for i in range(1, 21)]
-    for row_start in range(0, 20, 4):
+    keys = [f"A{i}" for i in range(1, 41)]
+    for row_start in range(0, 40, 4):
         row = keys[row_start:row_start + 4]
         line = "║  " + "   ".join(
             f"{s}:{'●' if slots[s] else '○'}" for s in row

@@ -659,6 +659,9 @@ function addFeedEntry(msg) {
   if (!msg || msg.readings) {
     return; // Thoát hàm ngay lập tức
   }
+  if (msg.payload.type === false || msg.payload.type === "false") {
+    alert(`Cảm biến ${msg.payload.device_name}, ${msg.payload.slot_number} bị hỏng`);
+  }
   const feed = document.getElementById('live-feed');
   const feedFull = document.getElementById('live-feed-full');
 
@@ -1005,28 +1008,42 @@ async function refreshDeviceDetail(id) {
   }
 }
 
-
 async function loadDetailChart(deviceId, field) {
   try {
-    const history = await api(
-      'GET',
-      `/api/v1/data/${deviceId}/history?field=${field}`
-    );
-
     const now = new Date();
+
     const startDate = new Date(now);
     startDate.setDate(now.getDate() - 29);
     startDate.setHours(0, 0, 0, 0);
 
+    const params = new URLSearchParams({
+      field: field,
+      start: startDate.toISOString(),
+      end: now.toISOString(),
+      limit: '10000',
+    });
+
+    const history = await api(
+      'GET',
+      `/api/v1/data/${encodeURIComponent(deviceId)}/history?${params.toString()}`
+    );
+
     const dailyCounts = {};
     const slotStates = {};
+
+    const getDayKey = d => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
 
     // Khởi tạo đủ 30 ngày gần nhất
     for (let i = 0; i < 30; i++) {
       const d = new Date(startDate);
       d.setDate(startDate.getDate() + i);
 
-      const dayKey = d.toISOString().slice(0, 10);
+      const dayKey = getDayKey(d);
 
       dailyCounts[dayKey] = {
         date: d,
@@ -1050,15 +1067,20 @@ async function loadDetailChart(deviceId, field) {
       })
       .forEach(r => {
         const d = new Date(r.date ?? r.timestamp);
-        const dayKey = d.toISOString().slice(0, 10);
+        const dayKey = getDayKey(d);
         const slotNumber = r.slot_number;
 
         if (!dailyCounts[dayKey] || slotNumber == null) return;
 
-        const occupied = r.is_occupied === true;
+        const occupied =
+          r.is_occupied === true ||
+          r.is_occupied === 1 ||
+          r.is_occupied === '1' ||
+          r.is_occupied === 'true' ||
+          r.is_occupied === 'TRUE';
+
         const prevOccupied = slotStates[slotNumber] ?? false;
 
-        // Trống -> có xe: tính là 1 lượt xe đỗ
         if (occupied && prevOccupied === false) {
           dailyCounts[dayKey].count += 1;
         }
@@ -1118,10 +1140,9 @@ async function loadDetailChart(deviceId, field) {
       },
     });
   } catch (e) {
-    console.error(e);
+    alert('Lỗi loadDetailChart: ' + (e?.message || e));
   }
 }
-
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -1346,12 +1367,33 @@ async function renderVehicle30dChart() {
     };
   }
 
+  const params = new URLSearchParams({
+    field: 'is_occupied',
+    start: startDate.toISOString(),
+    end: now.toISOString(),
+    limit: '10000',
+  });
+
   for (const device of devices) {
     try {
-      const history = await api(
+      const historyRaw = await api(
         'GET',
-        `/api/v1/data/${device.id}/history?field=is_occupied`
+        `/api/v1/data/${encodeURIComponent(device.id)}/history?${params.toString()}`
       );
+
+      let history = historyRaw;
+
+      if (!Array.isArray(history)) {
+        if (Array.isArray(historyRaw?.data)) {
+          history = historyRaw.data;
+        } else if (Array.isArray(historyRaw?.rows)) {
+          history = historyRaw.rows;
+        } else if (Array.isArray(historyRaw?.result)) {
+          history = historyRaw.result;
+        } else {
+          continue;
+        }
+      }
 
       const slotStates = {};
 
@@ -1376,7 +1418,13 @@ async function renderVehicle30dChart() {
 
           if (!dailyCounts[dayKey] || r.slot_number == null) return;
 
-          const occupied = r.is_occupied === true;
+          const occupied =
+            r.is_occupied === true ||
+            r.is_occupied === 1 ||
+            r.is_occupied === '1' ||
+            r.is_occupied === 'true' ||
+            r.is_occupied === 'TRUE';
+
           const prevOccupied = slotStates[slotKey] ?? false;
 
           if (occupied && prevOccupied === false) {
@@ -1402,7 +1450,6 @@ async function renderVehicle30dChart() {
   vehicle30dChart.data.datasets[0].data = chartData.map(r => r.count);
   vehicle30dChart.update();
 }
-
 
 // ── UI helpers ────────────────────────────────────────────────────────────
 function openModal(id) { document.getElementById(id).classList.add('open'); }
